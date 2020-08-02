@@ -1,0 +1,1 @@
+A simple tool to create a SQLite database of music looking files to locate duplicates
