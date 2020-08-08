@@ -49,20 +49,29 @@ func (fdb *FileDB) Exec(stmt string) (sql.Result, error) {
 }
 
 func (fdb *FileDB) createSchema() error {
-	_, err := fdb.Exec(`CREATE TABLE IF NOT EXISTS files  (
-		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-		path TEXT,
-		filename TEXT,
-		extension TEXT,
-		title TEXT,
-		album TEXT,
-		artist TEXT,
-		year INTEGER,
-		track_no TEXT,
-		size INTEGER,
-		xxhash TEXT
-	)`)
-	return err
+	schemas := []string{
+		`CREATE TABLE IF NOT EXISTS scanned_files  (
+			id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+			path TEXT,
+			filename TEXT,
+			extension TEXT,
+			title TEXT,
+			album TEXT,
+			artist TEXT,
+			year INTEGER,
+			track_no TEXT,
+			size INTEGER,
+			xxhash TEXT
+		)`,
+		`CREATE TABLE IF NOT EXISTS rejects AS SELECT * FROM scanned_files LIMIT 0`,
+		`CREATE TABLE IF NOT EXISTS duplicates AS SELECT *, ' ' as duplicate_of FROM scanned_files LIMIT 0`,
+	}
+	for _, stmt := range schemas {
+		if _, err := fdb.Exec(stmt); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 /*Insert a record*/
@@ -77,11 +86,10 @@ func (fdb *FileDB) Insert(record *Result) error {
 		return &s
 	}
 
-	stmt := `INSERT INTO files 
+	stmt := `INSERT INTO scanned_files 
 		(path, filename, extension, title, album, artist, year, track_no, size, xxhash)
 	VALUES
 		(?,?,?,?,?,?,?,?,?,?)`
-	// stmt := `INSERT INTO files(code, name, program) VALUES (?, ?, ?)`
 	statement, err := fdb.db.Prepare(stmt)
 	if err != nil {
 		log.Println(err.Error())
