@@ -69,6 +69,14 @@ func (fdb *FileDB) createSchema() error {
 func (fdb *FileDB) Insert(record *Result) error {
 	fdb.mutex.Lock()
 	defer fdb.mutex.Unlock()
+
+	nullifempty := func(s string) *string {
+		if s == "" {
+			return nil
+		}
+		return &s
+	}
+
 	stmt := `INSERT INTO files 
 		(path, filename, extension, title, album, artist, year, track_no, size, xxhash)
 	VALUES
@@ -79,7 +87,7 @@ func (fdb *FileDB) Insert(record *Result) error {
 		log.Println(err.Error())
 		return err
 	}
-	_, err = statement.Exec(record.Path, record.Filename, record.Extension, record.Title, record.Album, record.Artist, record.Year, record.TrackNo, record.Size, fmt.Sprintf("%x", record.XxHash))
+	_, err = statement.Exec(record.Path, record.Filename, record.Extension, record.Title, nullifempty(record.Album), nullifempty(record.Artist), nullifempty(record.Year), record.TrackNo, record.Size, fmt.Sprintf("%x", record.XxHash))
 	if err != nil {
 		log.Println(err.Error())
 		return err

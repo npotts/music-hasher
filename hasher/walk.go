@@ -12,6 +12,8 @@ import (
 var ignore = []string{
 	".DS_Store",
 	"desktop.ini",
+	".plist",
+	"db_errlog",
 }
 
 func badApple(path string) bool {
