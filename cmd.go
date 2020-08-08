@@ -1,21 +1,26 @@
 package main
 
 import (
-	"flag"
 	"os"
+
+	"github.com/alecthomas/kingpin"
 
 	"./hasher"
 )
 
-// hasher.PopulateDB()
 var (
 	cwd, _  = os.Getwd()
-	root    = flag.String("root", cwd, `Root path to start walking looking for files`)
-	db      = flag.String("db", cwd+"/music.db", `Path to Music database to populate`)
-	goprocs = flag.Int("readers", 10, `Number of concurrent filesystem readers to utilize`)
+	db      = kingpin.Flag("db", `Path to Music database to populate`).Short('d').Default(cwd + "/music.db").String()
+	goprocs = kingpin.Flag("procs", "Use this number of processes to scrape data; number of concurrent filesystem readers to utilize").Short('p').Default("10").Int()
+
+	assemble = kingpin.Command("assemble", "Assemble a Database by scraping a path")
+	asroot   = assemble.Arg("PATH", "Root path to start walking looking for files").ExistingDir()
 )
 
 func main() {
-	flag.Parse()
-	hasher.PopulateDB(*db, *root, *goprocs)
+	which := kingpin.Parse()
+	switch which {
+	case assemble.FullCommand():
+		hasher.PopulateDB(*db, *asroot, *goprocs)
+	}
 }
