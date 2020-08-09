@@ -42,6 +42,29 @@ type Result struct {
 	XxHash      sql.NullString `db:"xxhash"`
 }
 
+/*NewResult reads from Path and returns some info about the file at Path*/
+func NewResult(path string) (*Result, error) {
+	rst := &Result{
+		Path:      ns(path),
+		Filename:  ns(filepath.Base(path)),
+		Extension: ns(strings.ToLower(filepath.Ext(path))),
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return rst, err
+	}
+	defer file.Close()
+
+	if info, err := file.Stat(); err == nil {
+		rst.Size = sql.NullInt64{Int64: info.Size(), Valid: true}
+	}
+
+	rst.tagMetadata(file)
+	rst.xxhash(file)
+	return rst, nil
+}
+
 func (*Result) createStmt() string {
 	return `CREATE TABLE IF NOT EXISTS scanned_files (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, path TEXT, filename TEXT, extension TEXT, format TEXT, file_type TEXT, title TEXT, album TEXT, artist TEXT, album_artist TEXT, composer TEXT, genre TEXT, year INTEGER, track_no INTEGER, track_total INTEGER, disk_no INTEGER, disk_total INTEGER, comment TEXT, size INTEGER, xxhash TEXT)`
 }
@@ -87,25 +110,30 @@ func (r *Result) xxhash(file *os.File) {
 	}
 }
 
-/*Parse reads from Path and returns some info about the file at Path*/
-func Parse(path string) (*Result, error) {
-	rst := &Result{
-		Path:      ns(path),
-		Filename:  ns(filepath.Base(path)),
-		Extension: ns(strings.ToLower(filepath.Ext(path))),
+/*SameExceptPath returns True if everything except the following are identical:
+* ID
+* Path
+* Filename
+ */
+func (r *Result) SameExceptPath(o *Result) bool {
+	if r == nil || o == nil {
+		panic("Cannot perform comparison with nil Results")
 	}
-
-	file, err := os.Open(path)
-	if err != nil {
-		return rst, err
-	}
-	defer file.Close()
-
-	if info, err := file.Stat(); err == nil {
-		rst.Size = sql.NullInt64{Int64: info.Size(), Valid: true}
-	}
-
-	rst.tagMetadata(file)
-	rst.xxhash(file)
-	return rst, nil
+	return r.Extension.String == o.Extension.String && r.Extension.Valid == o.Extension.Valid &&
+		r.Format.String == o.Format.String && r.Format.Valid == o.Format.Valid &&
+		r.FileType.String == o.FileType.String && r.FileType.Valid == o.FileType.Valid &&
+		r.Title.String == o.Title.String && r.Title.Valid == o.Title.Valid &&
+		r.Album.String == o.Album.String && r.Album.Valid == o.Album.Valid &&
+		r.Artist.String == o.Artist.String && r.Artist.Valid == o.Artist.Valid &&
+		r.AlbumArtist.String == o.AlbumArtist.String && r.AlbumArtist.Valid == o.AlbumArtist.Valid &&
+		r.Composer.String == o.Composer.String && r.Composer.Valid == o.Composer.Valid &&
+		r.Genre.String == o.Genre.String && r.Genre.Valid == o.Genre.Valid &&
+		r.Year.Int64 == o.Year.Int64 && r.Year.Valid == o.Year.Valid &&
+		r.TrackNo.Int64 == o.TrackNo.Int64 && r.TrackNo.Valid == o.TrackNo.Valid &&
+		r.TrackTotal.Int64 == o.TrackTotal.Int64 && r.TrackTotal.Valid == o.TrackTotal.Valid &&
+		r.DiskNo.Int64 == o.DiskNo.Int64 && r.DiskNo.Valid == o.DiskNo.Valid &&
+		r.DiskTotal.Int64 == o.DiskTotal.Int64 && r.DiskTotal.Valid == o.DiskTotal.Valid &&
+		r.Comment.String == o.Comment.String && r.Comment.Valid == o.Comment.Valid &&
+		r.Size.Int64 == o.Size.Int64 && r.Size.Valid == o.Size.Valid &&
+		r.XxHash.String == o.XxHash.String && r.XxHash.Valid == o.XxHash.Valid
 }

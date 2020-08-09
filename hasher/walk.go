@@ -55,7 +55,7 @@ func PopulateDB(db string, rootPath string, goroutines int) error {
 
 	dbwriter := func() {
 		for file := range files {
-			if rec, err := Parse(file); err == nil {
+			if rec, err := NewResult(file); err == nil {
 				fdb.Insert(rec)
 			}
 			log.Printf("✓: %s\n", file)

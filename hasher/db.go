@@ -77,6 +77,25 @@ func (fdb *FileDB) Insert(record *Result) error {
 	return tx.Commit()
 }
 
+//MustExecMany simply blindly executes many sequential SQL strings
+func (fdb *FileDB) MustExecMany(stmt []string) {
+	log.Println("MustExecMany >")
+	for idx, statement := range stmt {
+		log.Printf("\t [%03d]: %s\n", idx, statement)
+		if _, err := fdb.Exec(statement); err != nil {
+			panic(err)
+		}
+	}
+}
+
+//WithDb allows you to directly access the database....
+func (fdb *FileDB) WithDb(fxn func(*sqlx.DB)) {
+	fdb.mutex.Lock()
+	defer fdb.mutex.Unlock()
+	fxn(fdb.db)
+
+}
+
 // /*func main() {
 // 	os.Remove("sqlite-database.db") // I delete the file to avoid duplicated records. SQLite is a file based database.
 
