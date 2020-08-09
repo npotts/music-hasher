@@ -15,6 +15,8 @@ var (
 
 	assemble = kingpin.Command("assemble", "Assemble a Database by scraping a path")
 	asroot   = assemble.Arg("PATH", "Root path to start walking looking for files").ExistingDir()
+
+	analyze = kingpin.Command("analyze", "Analyze data to look for duplicates")
 )
 
 func main() {
@@ -22,5 +24,9 @@ func main() {
 	switch which {
 	case assemble.FullCommand():
 		hasher.PopulateDB(*db, *asroot, *goprocs)
+	case analyze.FullCommand():
+		fdb := hasher.CreateFileDB(*db)
+		defer fdb.Close()
+		fdb.Prune()
 	}
 }

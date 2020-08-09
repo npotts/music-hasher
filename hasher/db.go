@@ -11,7 +11,7 @@ import (
 
 //CreateFileDB creates or opens an old BD
 func CreateFileDB(path string) *FileDB {
-	log.Printf("Creating %s\n", path)
+	log.Printf("Creating / Opening %s\n", path)
 	db, err := sqlx.Open("sqlite3", path)
 	if err != nil {
 		panic(err)
@@ -22,7 +22,7 @@ func CreateFileDB(path string) *FileDB {
 	if err := rtn.createSchema(); err != nil {
 		panic(err)
 	}
-	log.Printf("Created %s\n", path)
+	log.Printf("Created / Opened %s\n", path)
 	return rtn
 }
 
