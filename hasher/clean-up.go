@@ -1,7 +1,6 @@
 package hasher
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/jmoiron/sqlx"
@@ -21,17 +20,40 @@ func (h *hashcnt) Duplicates(db *sqlx.DB) Duplicates {
 	return recs
 }
 
-func (fdb *FileDB) hashDuplicates() (dups []hashcnt) {
+/*resolveHashDups resolves duplicated by pooling all files with the same hash into a pool,
+checking if the files in the pool are mostly the same, and if so, pickes on at random.
+
+It pushes into 'originals` a single records, and pushes the dupicated pairs into
+duplicates with pointers to the original record.
+
+Once these dups have been 'handled', it prunes them from scanned_files */
+func (fdb *FileDB) resolveHashDups() error {
 	//build duplicated (hash, count) table
 	fdb.MustExecMany([]string{
 		`DROP TABLE IF EXISTS duplicated_hashes`,
 		`CREATE TABLE duplicated_hashes AS SELECT xxhash, count(*) AS count FROM scanned_files GROUP BY xxhash HAVING count(xxhash) > 1`,
 	})
 
+	hashDups := []hashcnt{}
+
 	fdb.mutex.Lock()
-	defer fdb.mutex.Unlock()
-	fdb.db.Select(&dups, "SELECT * FROM duplicated_hashes")
-	return dups
+	fdb.db.Select(&hashDups, "SELECT * FROM duplicated_hashes")
+	fdb.mutex.Unlock()
+
+	for _, dup := range hashDups {
+		dupsWithSameHash := dup.Duplicates(fdb.db)
+		if keep := dupsWithSameHash.Resolve(); keep != nil {
+			toss := dupsWithSameHash.OtherThan(keep)
+			if err := fdb.Keep(keep, toss); err != nil {
+				return err
+			}
+		}
+	}
+	fdb.MustExecMany([]string{
+		`DELETE FROM scanned_files WHERE xxhash in (SELECT xxhash from duplicated_hashes)`,
+		`DROP TABLE IF EXISTS duplicated_hashes`,
+	})
+	return nil
 }
 
 /*Prune does some pre-defined sanity checks*/
@@ -42,22 +64,13 @@ func (fdb *FileDB) Prune() error {
 		`DELETE FROM scanned_files WHERE id in (SELECT scanned_files.id from scanned_files INNER JOIN rejects ON scanned_files.id = rejects.id)`, //prune
 	})
 
-	for _, hashset := range fdb.hashDuplicates() {
-		fdb.mutex.Lock()
-		dups := hashset.Duplicates(fdb.db)
-		fdb.mutex.Unlock()
-		if keep := dups.Resolve(); keep != nil {
-			toss := dups.OtherThan(keep)
-			fmt.Println(keep, toss)
-			if err := fdb.Keep(keep, toss); err != nil {
-				return err
-			}
+	for _, fxn := range []func() error{
+		fdb.resolveHashDups,
+	} {
+		if err := fxn(); err != nil {
+			panic(err)
 		}
 	}
-
-	fdb.MustExecMany([]string{
-		`DELETE FROM scanned_files WHERE id in (SELECT orignals.id from orignals INNER JOIN scanned_files ON scanned_files.id = orignals.id)`,
-	})
 
 	return nil
 }
