@@ -2,6 +2,7 @@ package hasher
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"sync"
 
@@ -54,6 +55,7 @@ func (fdb *FileDB) createSchema() error {
 		r.createStmt(),
 		`CREATE TABLE IF NOT EXISTS rejects AS SELECT ' ' as reason, * FROM scanned_files LIMIT 0`,
 		`CREATE TABLE IF NOT EXISTS duplicates AS SELECT *, ' ' as duplicate_of FROM scanned_files LIMIT 0`,
+		`CREATE TABLE IF NOT EXISTS orignals AS SELECT * FROM scanned_files LIMIT 0`,
 	}
 	for _, stmt := range schemas {
 		if _, err := fdb.Exec(stmt); err != nil {
@@ -93,7 +95,29 @@ func (fdb *FileDB) WithDb(fxn func(*sqlx.DB)) {
 	fdb.mutex.Lock()
 	defer fdb.mutex.Unlock()
 	fxn(fdb.db)
+}
 
+/*Keep adds */
+func (fdb *FileDB) Keep(keep *Result, dups Duplicates) error {
+	keepStmt := `INSERT INTO orignals SELECT * from scanned_files where id = :id`
+	dupStmt := fmt.Sprintf(`INSERT INTO duplicates SELECT *, %d as reason from scanned_files where id = ?`, keep.ID.Int64)
+	fmt.Println(dupStmt)
+
+	tx := fdb.db.MustBegin()
+	stmt, err := tx.PrepareNamed(keepStmt)
+	if err != nil {
+		panic(err)
+	}
+	stmt.MustExec(keep)
+
+	if len(dups) == 0 {
+		return tx.Commit()
+	}
+
+	for _, id := range dups {
+		tx.MustExec(dupStmt, id.ID.Int64)
+	}
+	return tx.Commit()
 }
 
 // /*func main() {

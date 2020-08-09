@@ -1,6 +1,7 @@
 package hasher
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/jmoiron/sqlx"
@@ -29,7 +30,6 @@ func (fdb *FileDB) hashDuplicates() (dups []hashcnt) {
 
 	fdb.mutex.Lock()
 	defer fdb.mutex.Unlock()
-
 	fdb.db.Select(&dups, "SELECT * FROM duplicated_hashes")
 	return dups
 }
@@ -47,10 +47,17 @@ func (fdb *FileDB) Prune() error {
 		dups := hashset.Duplicates(fdb.db)
 		fdb.mutex.Unlock()
 		if keep := dups.Resolve(); keep != nil {
-			log.Printf("Want to keep %v\n", keep)
-
+			toss := dups.OtherThan(keep)
+			fmt.Println(keep, toss)
+			if err := fdb.Keep(keep, toss); err != nil {
+				return err
+			}
 		}
 	}
+
+	fdb.MustExecMany([]string{
+		`DELETE FROM scanned_files WHERE id in (SELECT orignals.id from orignals INNER JOIN scanned_files ON scanned_files.id = orignals.id)`,
+	})
 
 	return nil
 }
