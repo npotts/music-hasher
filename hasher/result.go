@@ -110,12 +110,42 @@ func (r *Result) xxhash(file *os.File) {
 	}
 }
 
+//String is a stringer
+func (r *Result) String() string {
+	s := "Music Source\n"
+	s += fmt.Sprintf("\t- ID          :%d\n", r.ID.Int64)
+	s += fmt.Sprintf("\t- Path        :%s\n", r.Path.String)
+	s += fmt.Sprintf("\t- Filename    :%s\n", r.Filename.String)
+	s += fmt.Sprintf("\t- Extension   :%s\n", r.Extension.String)
+	s += fmt.Sprintf("\t- Format      :%s\n", r.Format.String)
+	s += fmt.Sprintf("\t- FileType    :%s\n", r.FileType.String)
+	s += fmt.Sprintf("\t- Title       :%s\n", r.Title.String)
+	s += fmt.Sprintf("\t- Album       :%s\n", r.Album.String)
+	s += fmt.Sprintf("\t- Artist      :%s\n", r.Artist.String)
+	s += fmt.Sprintf("\t- AlbumArtist :%s\n", r.AlbumArtist.String)
+	s += fmt.Sprintf("\t- Composer    :%s\n", r.Composer.String)
+	s += fmt.Sprintf("\t- Genre       :%s\n", r.Genre.String)
+	s += fmt.Sprintf("\t- Year        :%d\n", r.Year.Int64)
+	s += fmt.Sprintf("\t- TrackNo     :%d\n", r.TrackNo.Int64)
+	s += fmt.Sprintf("\t- TrackTotal  :%d\n", r.TrackTotal.Int64)
+	s += fmt.Sprintf("\t- DiskNo      :%d\n", r.DiskNo.Int64)
+	s += fmt.Sprintf("\t- DiskTotal   :%d\n", r.DiskTotal.Int64)
+	s += fmt.Sprintf("\t- Comment     :%s\n", r.Comment.String)
+	s += fmt.Sprintf("\t- Size        :%d\n", r.Size.Int64)
+	s += fmt.Sprintf("\t- XxHash      :%s\n", r.XxHash.String)
+	return s
+}
+
+//A ResultComparison returns True if the two results are similar enough by some mechanism
+type ResultComparison func(*Result, *Result) bool
+
 /*SameExceptPath returns True if everything except the following are identical:
 * ID
 * Path
 * Filename
  */
-func (r *Result) SameExceptPath(o *Result) bool {
+func SameExceptPath(r, o *Result) (same bool) {
+	// defer func() { fmt.Println("r, o are same: ", same) }()
 	if r == nil || o == nil {
 		panic("Cannot perform comparison with nil Results")
 	}

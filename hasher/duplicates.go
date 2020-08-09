@@ -29,31 +29,88 @@ func (d Duplicates) choices(header string) []string {
 	return c
 }
 
+/*Uniques splits d into 2 seperate sets, and returns the unique ones.
+* Set that are different as per comp
+* Set that are the same as per comp
+
+If len(d) < 2: returns (d, nil)
+*/
+func (d Duplicates) Uniques(comp ResultComparison) Duplicates {
+	if len(d) < 2 {
+		return d
+	}
+
+	unique := map[*Result]bool{}
+	similar := map[*Result]bool{}
+
+	for i := 0; i < len(d)-1; i++ {
+		a := d[0]
+		if val, ok := similar[a]; val && ok {
+			continue //already the same as something else
+		}
+		unique[a] = true
+		for _, b := range d[i+1:] {
+			if comp(a, b) {
+				similar[b] = true
+			}
+		}
+	}
+
+	f := func(m map[*Result]bool) Duplicates {
+		d := Duplicates{}
+		for k := range m {
+			d = append(d, k)
+		}
+		return d
+	}
+	//Same should only be one item
+	return f(unique)
+}
+
+//OtherThan returns a copy of d, except for r.
+func (d Duplicates) OtherThan(r *Result) Duplicates {
+	a := Duplicates{}
+	for _, o := range d {
+		if o != r {
+			a = append(a, o)
+		}
+	}
+	return a
+}
+
 /*Resolve Pickes the record to keep from a set.  If Result is nil, it
 indicates the user didnt want to make a choice, and should be discarded
 */
 func (d Duplicates) Resolve() *Result {
-
-	choices := d.choices("Skip for now")
-	prompt := promptui.Select{
-		Size:         len(choices),
-		Label:        "Select which to mark as 'keep'.  Selecting anything other than a row will skip",
-		Items:        choices,
-		CursorPos:    4,
-		HideSelected: true,
+	if len(d) < 1 {
+		panic("Resolve only work when working with > 1 element")
 	}
 
-	i, _, err := prompt.Run()
-
-	if err != nil {
-		log.Fatalf("Prompt failed %v\n", err)
-		panic(err)
+	chooser := func(some Duplicates) *Result {
+		choices := some.choices("Skip for now")
+		prompt := promptui.Select{
+			Size:         len(choices),
+			Label:        "Select which to mark as 'keep'.  Selecting anything other than a row will skip",
+			Items:        choices,
+			CursorPos:    4,
+			HideSelected: true,
+		}
+		i, _, err := prompt.Run()
+		if err != nil {
+			log.Fatalf("Prompt failed %v\n", err)
+			panic(err)
+		}
+		//dont select the Table
+		if i > 3 && i < len(choices)-2 {
+			return d[i-4]
+		}
+		return nil
 	}
 
-	//dont select the Table
-	if i > 3 && i < len(choices)-2 {
-		return d[i-4]
+	diffs := d.Uniques(SameExceptPath)
+	if len(diffs) > 1 {
+		// crap - we go more than 1 unique entry - We need the user to intervine
+		return chooser(diffs)
 	}
-	return nil
-
+	return diffs[0]
 }

@@ -46,8 +46,10 @@ func (fdb *FileDB) Prune() error {
 		fdb.mutex.Lock()
 		dups := hashset.Duplicates(fdb.db)
 		fdb.mutex.Unlock()
-		keep := dups.Resolve()
-		log.Printf("Want to keep %v\n", keep)
+		if keep := dups.Resolve(); keep != nil {
+			log.Printf("Want to keep %v\n", keep)
+
+		}
 	}
 
 	return nil
