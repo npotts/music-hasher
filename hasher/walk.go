@@ -14,6 +14,8 @@ var ignore = []string{
 	"desktop.ini",
 	".plist",
 	"db_errlog",
+	".strings",
+	".pdf",
 }
 
 func badApple(path string) bool {

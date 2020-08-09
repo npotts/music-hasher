@@ -2,17 +2,17 @@ package hasher
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"sync"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/mattn/go-sqlite3" // Import go-sqlite3 library
 )
 
 //CreateFileDB creates or opens an old BD
 func CreateFileDB(path string) *FileDB {
 	log.Printf("Creating %s\n", path)
-	db, err := sql.Open("sqlite3", path)
+	db, err := sqlx.Open("sqlite3", path)
 	if err != nil {
 		panic(err)
 	}
@@ -28,7 +28,7 @@ func CreateFileDB(path string) *FileDB {
 
 /*FileDB is a wrapper over a SQL database*/
 type FileDB struct {
-	db    *sql.DB
+	db    *sqlx.DB
 	mutex *sync.RWMutex
 }
 
@@ -49,21 +49,10 @@ func (fdb *FileDB) Exec(stmt string) (sql.Result, error) {
 }
 
 func (fdb *FileDB) createSchema() error {
+	r := Result{}
 	schemas := []string{
-		`CREATE TABLE IF NOT EXISTS scanned_files  (
-			id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-			path TEXT,
-			filename TEXT,
-			extension TEXT,
-			title TEXT,
-			album TEXT,
-			artist TEXT,
-			year INTEGER,
-			track_no TEXT,
-			size INTEGER,
-			xxhash TEXT
-		)`,
-		`CREATE TABLE IF NOT EXISTS rejects AS SELECT * FROM scanned_files LIMIT 0`,
+		r.createStmt(),
+		`CREATE TABLE IF NOT EXISTS rejects AS SELECT ' ' as reason, * FROM scanned_files LIMIT 0`,
 		`CREATE TABLE IF NOT EXISTS duplicates AS SELECT *, ' ' as duplicate_of FROM scanned_files LIMIT 0`,
 	}
 	for _, stmt := range schemas {
@@ -79,28 +68,13 @@ func (fdb *FileDB) Insert(record *Result) error {
 	fdb.mutex.Lock()
 	defer fdb.mutex.Unlock()
 
-	nullifempty := func(s string) *string {
-		if s == "" {
-			return nil
-		}
-		return &s
-	}
-
-	stmt := `INSERT INTO scanned_files 
-		(path, filename, extension, title, album, artist, year, track_no, size, xxhash)
-	VALUES
-		(?,?,?,?,?,?,?,?,?,?)`
-	statement, err := fdb.db.Prepare(stmt)
+	tx := fdb.db.MustBegin()
+	stmt, err := tx.PrepareNamed(record.insertStmt())
 	if err != nil {
-		log.Println(err.Error())
-		return err
+		panic(err)
 	}
-	_, err = statement.Exec(record.Path, record.Filename, record.Extension, record.Title, nullifempty(record.Album), nullifempty(record.Artist), nullifempty(record.Year), record.TrackNo, record.Size, fmt.Sprintf("%x", record.XxHash))
-	if err != nil {
-		log.Println(err.Error())
-		return err
-	}
-	return nil
+	stmt.MustExec(record)
+	return tx.Commit()
 }
 
 // /*func main() {
