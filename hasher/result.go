@@ -136,6 +136,14 @@ func (r *Result) String() string {
 	return s
 }
 
+//HasMetadata  if it has an title, artist,
+func (r *Result) HasMetadata() bool {
+	return r.Title.Valid && r.Title.String != "" &&
+		r.Album.Valid && r.Album.String != "" &&
+		(r.Artist.Valid && r.Artist.String != "" || r.AlbumArtist.Valid && r.AlbumArtist.String != "") &&
+		r.TrackNo.Valid && r.TrackNo.Int64 > 0
+}
+
 //A ResultComparison returns True if the two results are similar enough by some mechanism
 type ResultComparison func(*Result, *Result) bool
 
@@ -149,7 +157,8 @@ func SameExceptPath(r, o *Result) (same bool) {
 	if r == nil || o == nil {
 		panic("Cannot perform comparison with nil Results")
 	}
-	return r.Extension.String == o.Extension.String && r.Extension.Valid == o.Extension.Valid &&
+	return r.HasMetadata() && o.HasMetadata() &&
+		r.Extension.String == o.Extension.String && r.Extension.Valid == o.Extension.Valid &&
 		r.Format.String == o.Format.String && r.Format.Valid == o.Format.Valid &&
 		r.FileType.String == o.FileType.String && r.FileType.Valid == o.FileType.Valid &&
 		r.Title.String == o.Title.String && r.Title.Valid == o.Title.Valid &&
