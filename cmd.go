@@ -21,6 +21,12 @@ var (
 	dupNuke = kingpin.Command("dup-nuke", "Nuke (RM) located duplicated")
 )
 
+func panicIf(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
 	which := kingpin.Parse()
 	switch which {
@@ -29,9 +35,10 @@ func main() {
 	case analyze.FullCommand():
 		fdb := hasher.CreateFileDB(*db)
 		defer fdb.Close()
-		fdb.Prune()
+		panicIf(fdb.Prune())
 	case dupNuke.FullCommand():
 		fdb := hasher.CreateFileDB(*db)
+		panicIf(fdb.DupNuker())
 		defer fdb.Close()
 	}
 }

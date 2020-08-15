@@ -120,6 +120,29 @@ func (fdb *FileDB) Keep(keep *Result, dups Duplicates) error {
 	return tx.Commit()
 }
 
+/*DupNuker removes all files located in the duplicate column.*/
+func (fdb *FileDB) DupNuker() error {
+	dstmt := `SELECT path FROM duplicates`
+	tx := fdb.db.MustBegin()
+	rows, err := tx.Queryx(dstmt)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		res := &Result{}
+		for _, fxn := range []func() error{
+			func() error { return rows.StructScan(res) },
+			res.Delete,
+		} {
+			if err := fxn(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // /*func main() {
 // 	os.Remove("sqlite-database.db") // I delete the file to avoid duplicated records. SQLite is a file based database.
 

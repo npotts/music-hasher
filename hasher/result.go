@@ -144,6 +144,21 @@ func (r *Result) HasMetadata() bool {
 		r.TrackNo.Valid && r.TrackNo.Int64 > 0
 }
 
+//Delete the file
+func (r *Result) Delete() error {
+	if !r.Path.Valid {
+		return nil
+	}
+	st, err := os.Stat(r.Path.String)
+	fmt.Println(st, err)
+	if err == nil && st.Mode().IsRegular() {
+		fmt.Printf("* bye-bye %s\n", r.Path.String)
+		return os.Remove(r.Path.String)
+	}
+	fmt.Printf("* [Skipped] %s\n", r.Path.String)
+	return nil
+}
+
 //A ResultComparison returns True if the two results are similar enough by some mechanism
 type ResultComparison func(*Result, *Result) bool
 
