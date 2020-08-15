@@ -17,6 +17,8 @@ var (
 	asroot   = assemble.Arg("PATH", "Root path to start walking looking for files").ExistingDir()
 
 	analyze = kingpin.Command("analyze", "Analyze data to look for duplicates")
+
+	dupNuke = kingpin.Command("dup-nuke", "Nuke (RM) located duplicated")
 )
 
 func main() {
@@ -28,5 +30,8 @@ func main() {
 		fdb := hasher.CreateFileDB(*db)
 		defer fdb.Close()
 		fdb.Prune()
+	case dupNuke.FullCommand():
+		fdb := hasher.CreateFileDB(*db)
+		defer fdb.Close()
 	}
 }
