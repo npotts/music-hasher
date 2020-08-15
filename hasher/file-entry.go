@@ -183,6 +183,26 @@ func (r *FileEntry) ValidFormat() bool {
 	}
 }
 
+//NewName Suggests a new name
+func (r *FileEntry) NewName() string {
+	un := func(p sql.NullString) string {
+		if p.String == "" {
+			return "Unknown"
+		}
+		return strings.ReplaceAll(p.String, "\\", "\\\\")
+	}
+	ui := func(p sql.NullInt64) string {
+		if p.Int64 == 0 {
+			return "00"
+		}
+		return fmt.Sprintf("%02d", p.Int64)
+	}
+	if r.AlbumArtist.Valid && r.AlbumArtist.String != "" {
+		return filepath.Join(un(r.Artist), un(r.AlbumArtist), ui(r.TrackNo)+" "+un(r.Title)+r.Extension.String)
+	}
+	return filepath.Join(un(r.Artist), un(r.Album), ui(r.TrackNo)+" "+un(r.Title)+r.Extension.String)
+}
+
 /*Rename moves the file at `path` to a new path determined by:
  * <Root>/<Artist>/<Album>/<TrackNo>. - <Track>.<ext>
 It refuses to move items that:
@@ -204,23 +224,10 @@ func (r *FileEntry) Rename(root string) error {
 		return fromE("Artist, Album and Title cannot be NULL values")
 	}
 	if stat, err := os.Stat(r.Path.String); err != nil || !stat.Mode().IsRegular() {
-		return fromE("Appears to not exist on file system: %v", err)
+		return fromE("Appears to not exist on file s.  ystem: %v", err)
 	}
 
-	un := func(p sql.NullString) string {
-		if p.String == "" {
-			return "Unknown"
-		}
-		return p.String
-	}
-	ui := func(p sql.NullInt64) string {
-		if p.Int64 == 0 {
-			return "00"
-		}
-		return fmt.Sprintf("%02d", p.Int64)
-	}
-
-	newPath := filepath.Join(root, un(r.Artist), un(r.Album), ui(r.TrackNo)+". - "+un(r.Title)+r.Extension.String)
+	newPath := filepath.Join(root, r.NewName())
 	if st, er := os.Stat(newPath); er == nil && st.Mode().IsRegular() {
 		return fromE("Remote Path Exists!!!")
 	}
