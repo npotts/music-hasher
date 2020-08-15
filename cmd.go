@@ -19,6 +19,9 @@ var (
 	analyze = kingpin.Command("analyze", "Analyze data to look for duplicates")
 
 	dupNuke = kingpin.Command("dup-nuke", "Nuke (RM) located duplicated")
+
+	moveKnown = kingpin.Command("move", "Move non-duplicatd files into another folder tree preserving <root>/<Artist>/<album>/<title> heirarchy")
+	moveWhere = moveKnown.Arg("WHERE", "Move files to directory rooted here").ExistingDir()
 )
 
 func panicIf(err error) {
@@ -29,16 +32,18 @@ func panicIf(err error) {
 
 func main() {
 	which := kingpin.Parse()
+
+	fdb := hasher.CreateFileDB(*db)
+	defer fdb.Close()
+
 	switch which {
 	case assemble.FullCommand():
-		hasher.PopulateDB(*db, *asroot, *goprocs)
+		fdb.PopulateDB(*asroot, *goprocs)
 	case analyze.FullCommand():
-		fdb := hasher.CreateFileDB(*db)
-		defer fdb.Close()
 		panicIf(fdb.Prune())
 	case dupNuke.FullCommand():
-		fdb := hasher.CreateFileDB(*db)
 		panicIf(fdb.DupNuker())
-		defer fdb.Close()
+	case moveKnown.FullCommand():
+		panicIf(fdb.RenameInto(*moveWhere))
 	}
 }

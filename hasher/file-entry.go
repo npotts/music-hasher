@@ -168,6 +168,21 @@ func fromE(err string, args ...interface{}) Skipped {
 	return Skipped(fmt.Errorf(err, args...))
 }
 
+//ValidFormat returns true if the format and file type are ok
+func (r *FileEntry) ValidFormat() bool {
+	if !r.Format.Valid {
+		return false
+	}
+	switch r.Format.String {
+	case string(tag.UnknownFormat):
+		return false
+	case string(tag.MP4):
+		return true
+	default:
+		return r.FileType.Valid && r.FileType.String != string(tag.UnknownFileType)
+	}
+}
+
 /*Rename moves the file at `path` to a new path determined by:
  * <Root>/<Artist>/<Album>/<TrackNo>. - <Track>.<ext>
 It refuses to move items that:
@@ -181,7 +196,8 @@ It also:
 
 */
 func (r *FileEntry) Rename(root string) error {
-	if !r.Format.Valid || !r.FileType.Valid || r.Format.String == string(tag.UnknownFormat) || r.FileType.String == string(tag.UnknownFileType) {
+	//MP4 doesnt have a FileType.
+	if !r.ValidFormat() {
 		return fromE("Invalid file - unknown type or format")
 	}
 	if !r.Album.Valid || !r.Artist.Valid || !r.Title.Valid {
@@ -203,10 +219,20 @@ func (r *FileEntry) Rename(root string) error {
 		}
 		return fmt.Sprintf("%02d", p.Int64)
 	}
-	newPath := filepath.Join(root, un(r.Artist), un(r.Album), ui(r.TrackNo)+". - "+un(r.Title)+"."+r.Extension.String)
 
-	fmt.Println(newPath)
-	return nil
+	newPath := filepath.Join(root, un(r.Artist), un(r.Album), ui(r.TrackNo)+". - "+un(r.Title)+r.Extension.String)
+	if st, er := os.Stat(newPath); er == nil && st.Mode().IsRegular() {
+		return fromE("Remote Path Exists!!!")
+	}
+
+	mktree := func(path string) {
+		parent, _ := filepath.Split(path)
+		if err := os.MkdirAll(parent, os.ModePerm); err != nil {
+			panic(err)
+		}
+	}
+	mktree(newPath)
+	return os.Rename(r.Path.String, newPath)
 }
 
 //A FileEntryComparison returns True if the two results are similar enough by some mechanism

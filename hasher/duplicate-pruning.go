@@ -102,14 +102,6 @@ func (fdb *FileDB) resolveSameArtistAlbumTitle() error {
 
 /*Prune does some pre-defined sanity checks*/
 func (fdb *FileDB) Prune() error {
-	// Move obvious non-music files into rejected
-	fdb.MustExecMany([]string{
-		`INSERT INTO rejects SELECT 'Not Music File' as reason, * FROM scanned_files where lower(extension) not in ('.mp3', '.m4a', '.m4r')`,              // no non-music
-		`DELETE FROM scanned_files WHERE id in (SELECT scanned_files.id from scanned_files INNER JOIN rejects ON scanned_files.id = rejects.id)`,          // ... prune
-		`CREATE TABLE IF NOT EXISTS missing_tags AS SELECT * FROM scanned_files WHERE title IS NULL OR album IS NULL OR  artist IS NULL;`,                 //Missing artists, title, etc - fix the tags first
-		`DELETE FROM scanned_files WHERE id in (SELECT missing_tags.id from missing_tags INNER JOIN scanned_files ON scanned_files.id = missing_tags.id)`, // ... prune
-	})
-
 	//run through a set of cleanup functions
 	for _, fxn := range []func() error{
 		fdb.resolveHashDups,

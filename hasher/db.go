@@ -55,6 +55,7 @@ func (fdb *FileDB) createSchema() error {
 		r.createStmt(),
 		`CREATE TABLE IF NOT EXISTS rejects AS SELECT ' ' as reason, * FROM scanned_files LIMIT 0`,
 		`CREATE TABLE IF NOT EXISTS duplicates AS SELECT *, ' ' as duplicate_of FROM scanned_files LIMIT 0`,
+		`CREATE TABLE IF NOT EXISTS moved AS SELECT * FROM scanned_files LIMIT 0`,
 	}
 	for _, stmt := range schemas {
 		if _, err := fdb.Exec(stmt); err != nil {
@@ -139,22 +140,50 @@ func (fdb *FileDB) DupNuker() error {
 Generally, these get shoved in <root>/<artist>/<album>/<track> - <title>.<ext>
 */
 func (fdb *FileDB) RenameInto(root string) error {
-	tx := fdb.db.MustBegin()
-	cur, err := tx.Queryx(`SELECT * from scanned_files`)
-	if err != nil {
-		return err
-	}
-	defer cur.Close()
-	for cur.Next() {
-		res := &FileEntry{}
-		for _, fxn := range []func() error{
-			func() error { return cur.StructScan(res) },
-			func() error { return res.Rename(root) },
-		} {
-			if err := fxn(); err != nil {
-				return err
+	rename := func() []int64 {
+		ids := []int64{}
+
+		fdb.mutex.Lock()
+		defer fdb.mutex.Unlock()
+
+		tx := fdb.db.MustBegin()
+		cur, err := tx.Queryx(`SELECT * from scanned_files`)
+		if err != nil {
+			panic(err)
+		}
+		defer cur.Close()
+		for cur.Next() {
+			res := &FileEntry{}
+			if err := cur.StructScan(res); err != nil {
+				panic(err)
+			}
+
+			err := res.Rename(root)
+			switch err.(type) {
+			case nil:
+				ids = append(ids, res.ID.Int64)
+			case Skipped:
+			default:
+				panic(err)
 			}
 		}
+		tx.Commit()
+		return ids
 	}
+
+	markMoved := func(ids []int64) {
+		fdb.mutex.Lock()
+		defer fdb.mutex.Unlock()
+		tx := fdb.db.MustBegin()
+		for _, id := range ids {
+			tx.MustExec(`INSERT INTO moved SELECT * FROM scanned_files WHERE id=?`, id)
+		}
+		tx.Commit()
+	}
+	ids := rename()
+	markMoved(ids)
+
+	fdb.MustExecMany([]string{`DELETE FROM scanned_files WHERE id IN (SELECT id FROM moved)`})
+
 	return nil
 }
