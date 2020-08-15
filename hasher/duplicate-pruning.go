@@ -38,10 +38,9 @@ func (a *albAtrTitle) Duplicates(db *sqlx.DB) Duplicates {
 /*resolveHashDups resolves duplicated by pooling all files with the same hash into a pool,
 checking if the files in the pool are mostly the same, and if so, pickes on at random.
 
-It pushes into 'originals` a single records, and pushes the dupicated pairs into
-duplicates with pointers to the original record.
+It pushes the dupicated pairs into duplicates with pointers to the original record.
 
-Once these dups have been 'handled', it prunes them from scanned_files */
+Once these dups have been 'handled', it prunes them from scanned_files*/
 func (fdb *FileDB) resolveHashDups() error {
 	//build duplicated (hash, count) table
 	fdb.MustExecMany([]string{
@@ -120,6 +119,9 @@ func (fdb *FileDB) Prune() error {
 			panic(err)
 		}
 	}
+	fdb.MustExecMany([]string{
+		`DELETE FROM scanned_files WHERE id in (SELECT id from duplicates)`, // ... prune
+	})
 
 	return nil
 }

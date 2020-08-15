@@ -9,8 +9,8 @@ import (
 	"github.com/xlab/tablewriter"
 )
 
-//Duplicates are a set Results that in general, are the same song
-type Duplicates []*Result
+//Duplicates are a set FileEntrys that in general, are the same song
+type Duplicates []*FileEntry
 
 //String is a Stringer
 func (d Duplicates) String() string {
@@ -37,13 +37,13 @@ func (d Duplicates) choices(header string) []string {
 
 If len(d) < 2: returns (d, nil)
 */
-func (d Duplicates) Uniques(comp ResultComparison) Duplicates {
+func (d Duplicates) Uniques(comp FileEntryComparison) Duplicates {
 	if len(d) < 2 {
 		return d
 	}
 
-	unique := map[*Result]bool{}
-	similar := map[*Result]bool{}
+	unique := map[*FileEntry]bool{}
+	similar := map[*FileEntry]bool{}
 
 	for i := 0; i < len(d)-1; i++ {
 		a := d[0]
@@ -58,7 +58,7 @@ func (d Duplicates) Uniques(comp ResultComparison) Duplicates {
 		}
 	}
 
-	f := func(m map[*Result]bool) Duplicates {
+	f := func(m map[*FileEntry]bool) Duplicates {
 		d := Duplicates{}
 		for k := range m {
 			d = append(d, k)
@@ -70,7 +70,7 @@ func (d Duplicates) Uniques(comp ResultComparison) Duplicates {
 }
 
 //OtherThan returns a copy of d, except for r.
-func (d Duplicates) OtherThan(r *Result) Duplicates {
+func (d Duplicates) OtherThan(r *FileEntry) Duplicates {
 	a := Duplicates{}
 	for _, o := range d {
 		if o != r {
@@ -80,15 +80,15 @@ func (d Duplicates) OtherThan(r *Result) Duplicates {
 	return a
 }
 
-/*Resolve Pickes the record to keep from a set.  If Result is nil, it
+/*Resolve Pickes the record to keep from a set.  If FileEntry is nil, it
 indicates the user didnt want to make a choice, and should be discarded
 */
-func (d Duplicates) Resolve(comp ResultComparison) *Result {
+func (d Duplicates) Resolve(comp FileEntryComparison) *FileEntry {
 	if len(d) < 1 {
 		panic("Resolve only work when working with > 1 element")
 	}
 
-	chooser := func(some Duplicates) *Result {
+	chooser := func(some Duplicates) *FileEntry {
 		choices := some.choices("Skip for now")
 		prompt := promptui.Select{
 			Size:         len(choices),

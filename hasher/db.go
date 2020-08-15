@@ -50,12 +50,11 @@ func (fdb *FileDB) Exec(stmt string) (sql.Result, error) {
 }
 
 func (fdb *FileDB) createSchema() error {
-	r := Result{}
+	r := FileEntry{}
 	schemas := []string{
 		r.createStmt(),
 		`CREATE TABLE IF NOT EXISTS rejects AS SELECT ' ' as reason, * FROM scanned_files LIMIT 0`,
 		`CREATE TABLE IF NOT EXISTS duplicates AS SELECT *, ' ' as duplicate_of FROM scanned_files LIMIT 0`,
-		`CREATE TABLE IF NOT EXISTS orignals AS SELECT * FROM scanned_files LIMIT 0`,
 	}
 	for _, stmt := range schemas {
 		if _, err := fdb.Exec(stmt); err != nil {
@@ -66,7 +65,7 @@ func (fdb *FileDB) createSchema() error {
 }
 
 /*Insert a record*/
-func (fdb *FileDB) Insert(record *Result) error {
+func (fdb *FileDB) Insert(record *FileEntry) error {
 	fdb.mutex.Lock()
 	defer fdb.mutex.Unlock()
 
@@ -98,17 +97,9 @@ func (fdb *FileDB) WithDb(fxn func(*sqlx.DB)) {
 }
 
 /*Keep adds */
-func (fdb *FileDB) Keep(keep *Result, dups Duplicates) error {
-	keepStmt := `INSERT INTO orignals SELECT * from scanned_files where id = :id`
+func (fdb *FileDB) Keep(keep *FileEntry, dups Duplicates) error {
 	dupStmt := fmt.Sprintf(`INSERT INTO duplicates SELECT *, %d as reason from scanned_files where id = ?`, keep.ID.Int64)
-	fmt.Println(dupStmt)
-
 	tx := fdb.db.MustBegin()
-	stmt, err := tx.PrepareNamed(keepStmt)
-	if err != nil {
-		panic(err)
-	}
-	stmt.MustExec(keep)
 
 	if len(dups) == 0 {
 		return tx.Commit()
@@ -130,10 +121,35 @@ func (fdb *FileDB) DupNuker() error {
 	}
 	defer rows.Close()
 	for rows.Next() {
-		res := &Result{}
+		res := &FileEntry{}
 		for _, fxn := range []func() error{
 			func() error { return rows.StructScan(res) },
 			res.Delete,
+		} {
+			if err := fxn(); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+/*RenameInto moves files from the source locations into <root>.
+
+Generally, these get shoved in <root>/<artist>/<album>/<track> - <title>.<ext>
+*/
+func (fdb *FileDB) RenameInto(root string) error {
+	tx := fdb.db.MustBegin()
+	cur, err := tx.Queryx(`SELECT * from scanned_files`)
+	if err != nil {
+		return err
+	}
+	defer cur.Close()
+	for cur.Next() {
+		res := &FileEntry{}
+		for _, fxn := range []func() error{
+			func() error { return cur.StructScan(res) },
+			func() error { return res.Rename(root) },
 		} {
 			if err := fxn(); err != nil {
 				return err
