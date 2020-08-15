@@ -49,6 +49,9 @@ func NewResult(path string) (*Result, error) {
 		Filename:  ns(filepath.Base(path)),
 		Extension: ns(strings.ToLower(filepath.Ext(path))),
 	}
+	if p, err := filepath.Abs(path); err == nil {
+		rst.Path = ns(p)
+	}
 
 	file, err := os.Open(path)
 	if err != nil {
