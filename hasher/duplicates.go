@@ -1,6 +1,7 @@
 package hasher
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -18,13 +19,14 @@ func (d Duplicates) String() string {
 
 func (d Duplicates) choices(header string) []string {
 	table := tablewriter.CreateTable()
-	table.AddHeaders("ID", "Path", "Title", "Album")
+	table.AddHeaders("ID", "Path", "Title", "Album", "Artist", "Track", "Size")
 	for _, dup := range d {
-		table.AddRow(dup.ID.Int64, dup.Path.String, dup.Title.String, dup.Album.String)
+		fmt.Println(dup)
+		table.AddRow(dup.ID.Int64, dup.Path.String, dup.Title.String, dup.Album.String, dup.Artist.String, dup.TrackNo.Int64, dup.Size.Int64)
 	}
 	c := []string{header}
-	for _, ch := range strings.Split(table.Render(), "\n") {
-		c = append(c, ch)
+	for _, line := range strings.Split(table.Render(), "\n") {
+		c = append(c, line)
 	}
 	return c
 }
@@ -81,7 +83,7 @@ func (d Duplicates) OtherThan(r *Result) Duplicates {
 /*Resolve Pickes the record to keep from a set.  If Result is nil, it
 indicates the user didnt want to make a choice, and should be discarded
 */
-func (d Duplicates) Resolve() *Result {
+func (d Duplicates) Resolve(comp ResultComparison) *Result {
 	if len(d) < 1 {
 		panic("Resolve only work when working with > 1 element")
 	}
@@ -107,10 +109,13 @@ func (d Duplicates) Resolve() *Result {
 		return nil
 	}
 
-	diffs := d.Uniques(SameExceptPath)
-	if len(diffs) > 1 {
-		// crap - we go more than 1 unique entry - We need the user to intervine
-		return chooser(diffs)
+	if comp != nil {
+		diffs := d.Uniques(comp)
+		if len(diffs) > 1 {
+			// crap - we go more than 1 unique entry - We need the user to intervine
+			return chooser(diffs)
+		}
+		return diffs[0]
 	}
-	return diffs[0]
+	return chooser(d)
 }

@@ -150,12 +150,11 @@ func (r *Result) Delete() error {
 		return nil
 	}
 	st, err := os.Stat(r.Path.String)
-	fmt.Println(st, err)
 	if err == nil && st.Mode().IsRegular() {
 		fmt.Printf("* bye-bye %s\n", r.Path.String)
 		return os.Remove(r.Path.String)
 	}
-	fmt.Printf("* [Skipped] %s\n", r.Path.String)
+	fmt.Printf("* [Gone?] %s\n", r.Path.String)
 	return nil
 }
 
