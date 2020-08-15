@@ -16,6 +16,8 @@ var ignore = []string{
 	"db_errlog",
 	".strings",
 	".pdf",
+	".png",
+	".gif",
 }
 
 func badApple(path string) bool {
