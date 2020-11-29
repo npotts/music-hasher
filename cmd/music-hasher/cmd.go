@@ -5,7 +5,7 @@ import (
 
 	"github.com/alecthomas/kingpin"
 
-	"./hasher"
+	"github.com/npotts/music-hasher/hasher"
 )
 
 var (
